@@ -1,105 +1,94 @@
-<!-- TO ACHIEVE THIS TYPE IN "!" AND PRESS "TAB" -->
-<!DOCTYPE html>
-
-<!-- html below is a tag pair. "lang" is a language setting and is set to English. Html has 2 children: head and body -->
-<html lang="en">
-<!-- head below is a tag pair. It contains metadata about the document and links to external resources. -->
-<head>
-    <!-- meta below is a tag pair. It provides metadata about the HTML document. chrset = "UTF-8" is pulling all latin charachters-->
-    <meta charset="UTF-8">
-    <!-- Tag pair. Provides metadata about the HTML document. name = "viewport" is setting the viewport to the device's width and initial scale to 1.0 -->
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PixelArt Image Centerer</title>
-
-    <!-- Favicons -->
-    <link rel="icon" type="image/png" href="/favicons/favicon-48x48.png" sizes="48x48" />
-    <link rel="icon" type="image/svg+xml" href="/favicons/favicon.svg" />
-    <link rel="shortcut icon" href="/favicons/favicon.ico" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/favicons/apple-touch-icon.png" />
-    <meta name="apple-mobile-web-app-title" content="Web Dev Starter" />
-    <link rel="manifest" href="/favicons/site.webmanifest" />    
-
-    <!-- Stylesheet -->
-    <link rel="stylesheet" href="style.css">
-
-    <!-- JavaScript -->
-     <!-- script:src and then press tab for shortcut-->
-    <script src="script.js" defer> </script>
-
-</head>
-
-<!-- body below is a tag pair. It contains the content of the document. -->
-<body>
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Image Centering & Rotation Processor</title>
+  <style>
+    .blue-button {
+      background-color: #007bff;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      margin-top: 10px;
+      cursor: pointer;
+      border-radius: 5px;
+      font-size: 14px;
+      text-decoration: none;
+      display: inline-block;
+    }
+    .blue-button:hover {
+      background-color: #0056b3;
+    }
+  </style>
 </head>
-<body>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Image Centering & Rotation Processor</title>
-</head>
-
 <body>
   <h2>Upload Folder of Images</h2>
   <input type="file" id="imageFolder" webkitdirectory directory multiple />
-  <button id="process">Process Folder Images</button>
-  <a class="blue-button" id="downloadZip" style="display:none">Download Processed Images</a>
+  <button id="process">Process Images</button>
+  <a id="downloadZip" class="blue-button" style="display:none">Download Processed Images</a>
 
   <h2>Or Upload a Single Image</h2>
   <input type="file" id="singleImage" accept="image/*" />
   <button id="processSingle">Process Single Image</button>
-  <a class="blue-button" id="downloadSingle" style="display:none">Download Single Image</a>
+  <a id="downloadSingle" class="blue-button" style="display:none">Download Processed Image</a>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script>
     const toBlob = (canvas) => new Promise(resolve => canvas.toBlob(resolve));
 
-    function rotateAndCenterImage(img, name) {
+    function determineRotationType(img) {
+      const ratio = img.width / img.height;
+      if (ratio >= 2.5) return "diagonal-up";     // Wide → rotate upward ↖
+      if (ratio <= 1 / 2.5) return "diagonal-down"; // Tall → rotate downward ↘
+      return "none";
+    }
+
+    function rotateAndCenterImage(img, rotateType) {
       const canvas = document.createElement("canvas");
       const ctx = canvas.getContext("2d");
       canvas.width = 400;
       canvas.height = 400;
 
-      const aspectRatio = img.width / img.height;
-      let finalWidth = 0, finalHeight = 0;
-      let offsetX = 0, offsetY = 0;
+      const maxSize = 360;
+      let scale = 1;
+      let angle = 0;
 
-      const maxDim = 360; // Max dimension in the 400x400 canvas with padding
-
-      if (aspectRatio >= 2.5 || aspectRatio <= 1 / 2.5) {
-        // Rotate diagonally (45 degrees)
-        const diagCanvas = document.createElement("canvas");
-        const diagCtx = diagCanvas.getContext("2d");
-        diagCanvas.width = img.width;
-        diagCanvas.height = img.height;
-        diagCtx.drawImage(img, 0, 0);
-
-        const rotated = document.createElement("canvas");
-        rotated.width = maxDim;
-        rotated.height = maxDim;
-        const rCtx = rotated.getContext("2d");
-        rCtx.translate(0, maxDim);
-        rCtx.rotate(-Math.PI / 4);
-        const scale = Math.min(maxDim / img.width, maxDim / img.height);
-        rCtx.drawImage(img, 0, 0, img.width, img.height, 0, 0, img.width * scale, img.height * scale);
-        ctx.drawImage(rotated, (400 - maxDim) / 2, (400 - maxDim) / 2);
-      } else {
-        // Center normally
-        const scale = Math.min(maxDim / img.width, maxDim / img.height);
-        finalWidth = img.width * scale;
-        finalHeight = img.height * scale;
-        offsetX = (400 - finalWidth) / 2;
-        offsetY = (400 - finalHeight) / 2;
-        ctx.drawImage(img, offsetX, offsetY, finalWidth, finalHeight);
+      if (rotateType === "diagonal-down") {
+        angle = 45 * Math.PI / 180;
+      } else if (rotateType === "diagonal-up") {
+        angle = -45 * Math.PI / 180;
       }
 
+      const tempCanvas = document.createElement("canvas");
+      const tempCtx = tempCanvas.getContext("2d");
+      tempCanvas.width = img.width;
+      tempCanvas.height = img.height;
+      tempCtx.drawImage(img, 0, 0);
+
+      let rotatedCanvas = tempCanvas;
+
+      if (rotateType !== "none") {
+        // Create a larger canvas for rotation
+        const diagSize = Math.sqrt(img.width * img.width + img.height * img.height);
+        rotatedCanvas = document.createElement("canvas");
+        rotatedCanvas.width = diagSize;
+        rotatedCanvas.height = diagSize;
+
+        const rCtx = rotatedCanvas.getContext("2d");
+        rCtx.translate(diagSize / 2, diagSize / 2);
+        rCtx.rotate(angle);
+        rCtx.drawImage(tempCanvas, -img.width / 2, -img.height / 2);
+      }
+
+      // Scale to fit 360x360 area
+      scale = Math.min(maxSize / rotatedCanvas.width, maxSize / rotatedCanvas.height);
+      const drawWidth = rotatedCanvas.width * scale;
+      const drawHeight = rotatedCanvas.height * scale;
+      const offsetX = (400 - drawWidth) / 2;
+      const offsetY = (400 - drawHeight) / 2;
+
+      ctx.drawImage(rotatedCanvas, offsetX, offsetY, drawWidth, drawHeight);
       return canvas;
     }
 
@@ -123,7 +112,8 @@
           reader.readAsDataURL(file);
         });
 
-        const canvas = rotateAndCenterImage(img, file.name);
+        const rotateType = determineRotationType(img);
+        const canvas = rotateAndCenterImage(img, rotateType);
         const blob = await toBlob(canvas);
         zip.file(file.name, blob);
       }
@@ -138,9 +128,9 @@
     });
 
     document.getElementById("processSingle").addEventListener("click", async () => {
-      const fileInput = document.getElementById("singleImage");
-      const file = fileInput.files[0];
-      if (!file || !file.type.startsWith("image/")) return alert("Please upload an image file.");
+      const input = document.getElementById("singleImage");
+      const file = input.files[0];
+      if (!file || !file.type.startsWith("image/")) return alert("Please upload a valid image.");
 
       const img = new Image();
       const reader = new FileReader();
@@ -153,22 +143,17 @@
         reader.readAsDataURL(file);
       });
 
-      const canvas = rotateAndCenterImage(img, file.name);
+      const rotateType = determineRotationType(img);
+      const canvas = rotateAndCenterImage(img, rotateType);
       const blob = await toBlob(canvas);
+
       const url = URL.createObjectURL(blob);
-      const singleDownload = document.getElementById("downloadSingle");
-      singleDownload.href = url;
-      singleDownload.download = file.name;
-      singleDownload.style.display = "inline";
-      singleDownload.textContent = "Download Single Image";
+      const downloadLink = document.getElementById("downloadSingle");
+      downloadLink.href = url;
+      downloadLink.download = file.name;
+      downloadLink.style.display = "inline";
+      downloadLink.textContent = "Download Processed Image";
     });
   </script>
 </body>
 </html>
-</body>
-</html>
-
-
-</body>
-</html>
-
