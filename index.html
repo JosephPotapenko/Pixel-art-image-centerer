@@ -44,14 +44,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Image Centering & Rotation Processor</title>
 </head>
-<body>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Image Centering & Rotation Processor</title>
-  <style>
+
     .blue-button {
       background-color: #007bff;
       color: white;
@@ -64,88 +57,63 @@
     }
     .blue-button:hover {
       background-color: #0056b3;
-    }
-  </style>
-</head>
+    } 
+
 <body>
   <h2>Upload Folder of Images</h2>
   <input type="file" id="imageFolder" webkitdirectory directory multiple />
-  <button id">Process Images</button>
-  <a id="downloadZip" class="blue-button" style="display:none">Download Processed Images</a>
+  <button id="process">Process Folder Images</button>
+  <a class="blue-button" id="downloadZip" style="display:none">Download Processed Images</a>
 
   <h2>Or Upload a Single Image</h2>
   <input type="file" id="singleImage" accept="image/*" />
-  <button id">Process Single Image</button>
-  <a id="downloadSingle" class="blue-button" style="display:none">Download Processed Image</a>
+  <button id="processSingle">Process Single Image</button>
+  <a class="blue-button" id="downloadSingle" style="display:none">Download Single Image</a>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script>
     const toBlob = (canvas) => new Promise(resolve => canvas.toBlob(resolve));
 
-    function rotateAndCenterImage(img, rotateType) {
+    function rotateAndCenterImage(img, name) {
       const canvas = document.createElement("canvas");
       const ctx = canvas.getContext("2d");
       canvas.width = 400;
       canvas.height = 400;
 
       const aspectRatio = img.width / img.height;
-      const maxSize = 360; // Leave margin
+      let finalWidth = 0, finalHeight = 0;
+      let offsetX = 0, offsetY = 0;
 
-      let scale, tempCanvas = document.createElement("canvas"), tCtx = tempCanvas.getContext("2d");
-      let angle = 0;
+      const maxDim = 360; // Max dimension in the 400x400 canvas with padding
 
-      if (rotateType === "diagonal-down") {
-        angle = 45 * Math.PI / 180;
-      } else if (rotateType === "diagonal-up") {
-        angle = -45 * Math.PI / 180;
-      }
+      if (aspectRatio >= 2.5 || aspectRatio <= 1 / 2.5) {
+        // Rotate diagonally (45 degrees)
+        const diagCanvas = document.createElement("canvas");
+        const diagCtx = diagCanvas.getContext("2d");
+        diagCanvas.width = img.width;
+        diagCanvas.height = img.height;
+        diagCtx.drawImage(img, 0, 0);
 
-      const isDiagonal = rotateType !== "none";
-
-      if (isDiagonal) {
-        tempCanvas.width = img.width;
-        tempCanvas.height = img.height;
-        tCtx.drawImage(img, 0, 0);
-
-        // Create rotated canvas
-        const rotatedCanvas = document.createElement("canvas");
-        const rCtx = rotatedCanvas.getContext("2d");
-
-        // Estimate bounding box after rotation
-        const diagSize = Math.sqrt(img.width * img.width + img.height * img.height);
-        rotatedCanvas.width = diagSize;
-        rotatedCanvas.height = diagSize;
-
-        rCtx.translate(rotatedCanvas.width / 2, rotatedCanvas.height / 2);
-        rCtx.rotate(angle);
-
-        scale = Math.min(maxSize / rotatedCanvas.width, maxSize / rotatedCanvas.height);
-
-        rCtx.scale(scale, scale);
-        rCtx.drawImage(tempCanvas, -img.width / 2, -img.height / 2);
-
-        const x = (400 - rotatedCanvas.width * scale) / 2;
-        const y = (400 - rotatedCanvas.height * scale) / 2;
-
-        ctx.drawImage(rotatedCanvas, x, y);
+        const rotated = document.createElement("canvas");
+        rotated.width = maxDim;
+        rotated.height = maxDim;
+        const rCtx = rotated.getContext("2d");
+        rCtx.translate(0, maxDim);
+        rCtx.rotate(-Math.PI / 4);
+        const scale = Math.min(maxDim / img.width, maxDim / img.height);
+        rCtx.drawImage(img, 0, 0, img.width, img.height, 0, 0, img.width * scale, img.height * scale);
+        ctx.drawImage(rotated, (400 - maxDim) / 2, (400 - maxDim) / 2);
       } else {
-        // No rotation, center normally
-        scale = Math.min(maxSize / img.width, maxSize / img.height);
-        const drawWidth = img.width * scale;
-        const drawHeight = img.height * scale;
-        const offsetX = (400 - drawWidth) / 2;
-        const offsetY = (400 - drawHeight) / 2;
-        ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
+        // Center normally
+        const scale = Math.min(maxDim / img.width, maxDim / img.height);
+        finalWidth = img.width * scale;
+        finalHeight = img.height * scale;
+        offsetX = (400 - finalWidth) / 2;
+        offsetY = (400 - finalHeight) / 2;
+        ctx.drawImage(img, offsetX, offsetY, finalWidth, finalHeight);
       }
 
       return canvas;
-    }
-
-    function determineRotationType(img) {
-      const ratio = img.width / img.height;
-      if (ratio >= 2.5) return "diagonal-up";
-      if (ratio <= 1 / 2.5) return "diagonal-down";
-      return "none";
     }
 
     document.getElementById("process").addEventListener("click", async () => {
@@ -168,8 +136,7 @@
           reader.readAsDataURL(file);
         });
 
-        const rotateType = determineRotationType(img);
-        const canvas = rotateAndCenterImage(img, rotateType);
+        const canvas = rotateAndCenterImage(img, file.name);
         const blob = await toBlob(canvas);
         zip.file(file.name, blob);
       }
@@ -184,9 +151,9 @@
     });
 
     document.getElementById("processSingle").addEventListener("click", async () => {
-      const input = document.getElementById("singleImage");
-      const file = input.files[0];
-      if (!file || !file.type.startsWith("image/")) return alert("Please upload a valid image.");
+      const fileInput = document.getElementById("singleImage");
+      const file = fileInput.files[0];
+      if (!file || !file.type.startsWith("image/")) return alert("Please upload an image file.");
 
       const img = new Image();
       const reader = new FileReader();
@@ -199,18 +166,22 @@
         reader.readAsDataURL(file);
       });
 
-      const rotateType = determineRotationType(img);
-      const canvas = rotateAndCenterImage(img, rotateType);
+      const canvas = rotateAndCenterImage(img, file.name);
       const blob = await toBlob(canvas);
-
       const url = URL.createObjectURL(blob);
-      const downloadLink = document.getElementById("downloadSingle");
-      downloadLink.href = url;
-      downloadLink.download = file.name;
-      downloadLink.style.display = "inline";
-      downloadLink.textContent = "Download Processed Image";
+      const singleDownload = document.getElementById("downloadSingle");
+      singleDownload.href = url;
+      singleDownload.download = file.name;
+      singleDownload.style.display = "inline";
+      singleDownload.textContent = "Download Single Image";
     });
   </script>
+</body>
+</html>
+</body>
+</html>
+
+
 </body>
 </html>
 
