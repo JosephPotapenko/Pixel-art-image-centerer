@@ -8,7 +8,7 @@
     <meta charset="UTF-8">
     <!-- Tag pair. Provides metadata about the HTML document. name = "viewport" is setting the viewport to the device's width and initial scale to 1.0 -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Web Dev Starter</title>
+    <title>PixelArt Image Centerer</title>
 
     <!-- Favicons -->
     <link rel="icon" type="image/png" href="/favicons/favicon-48x48.png" sizes="48x48" />
@@ -29,8 +29,102 @@
 
 <!-- body below is a tag pair. It contains the content of the document. -->
 <body>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Image Centering & Rotation Processor</title>
+</head>
+<body>
+  <h2>Upload Folder of Images</h2>
+  <input type="file" id="imageFolder" webkitdirectory directory multiple />
+  <button id="process">Process Images</button>
+  <a id="downloadZip" style="display:none">Download Processed Images</a>
 
-    <h1>Web Dev Starter</h1>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script>
+    const toBlob = (canvas) => new Promise(resolve => canvas.toBlob(resolve));
+
+    function rotateAndCenterImage(img, name) {
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+      canvas.width = 400;
+      canvas.height = 400;
+
+      const aspectRatio = img.width / img.height;
+      let finalWidth = 0, finalHeight = 0;
+      let offsetX = 0, offsetY = 0;
+
+      const maxDim = 360; // Max dimension in the 400x400 canvas with padding
+
+      if (aspectRatio >= 2.5 || aspectRatio <= 1 / 2.5) {
+        // Rotate diagonally (45 degrees)
+        const diagCanvas = document.createElement("canvas");
+        const diagCtx = diagCanvas.getContext("2d");
+        diagCanvas.width = img.width;
+        diagCanvas.height = img.height;
+        diagCtx.drawImage(img, 0, 0);
+
+        const rotated = document.createElement("canvas");
+        rotated.width = maxDim;
+        rotated.height = maxDim;
+        const rCtx = rotated.getContext("2d");
+        rCtx.translate(0, maxDim);
+        rCtx.rotate(-Math.PI / 4);
+        const scale = Math.min(maxDim / img.width, maxDim / img.height);
+        rCtx.drawImage(img, 0, 0, img.width, img.height, 0, 0, img.width * scale, img.height * scale);
+        ctx.drawImage(rotated, (400 - maxDim) / 2, (400 - maxDim) / 2);
+      } else {
+        // Center normally
+        const scale = Math.min(maxDim / img.width, maxDim / img.height);
+        finalWidth = img.width * scale;
+        finalHeight = img.height * scale;
+        offsetX = (400 - finalWidth) / 2;
+        offsetY = (400 - finalHeight) / 2;
+        ctx.drawImage(img, offsetX, offsetY, finalWidth, finalHeight);
+      }
+
+      return canvas;
+    }
+
+    document.getElementById("process").addEventListener("click", async () => {
+      const input = document.getElementById("imageFolder");
+      const files = [...input.files];
+      if (!files.length) return alert("Please upload a folder of images.");
+
+      const zip = new JSZip();
+
+      for (const file of files) {
+        if (!file.type.startsWith("image/")) continue;
+        const img = new Image();
+        const reader = new FileReader();
+
+        await new Promise((resolve) => {
+          reader.onload = () => {
+            img.onload = () => resolve();
+            img.src = reader.result;
+          };
+          reader.readAsDataURL(file);
+        });
+
+        const canvas = rotateAndCenterImage(img, file.name);
+        const blob = await toBlob(canvas);
+        zip.file(file.name, blob);
+      }
+
+      const content = await zip.generateAsync({ type: "blob" });
+      const url = URL.createObjectURL(content);
+      const downloadLink = document.getElementById("downloadZip");
+      downloadLink.href = url;
+      downloadLink.download = "centered_images.zip";
+      downloadLink.style.display = "inline";
+      downloadLink.textContent = "Download Processed Images";
+    });
+  </script>
+</body>
+</html>
+
 
 </body>
 </html>
